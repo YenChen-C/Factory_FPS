@@ -1,0 +1,17 @@
+const fs=require('fs'),assert=require('assert');
+const harness=fs.readFileSync(__dirname+'/test.cjs','utf8').split("check('offline app")[0];
+const {A,T,C,els,tick}=new Function('require','__dirname',harness+';return {A,T,C,els,tick};')(require,__dirname);
+const checks=[];function check(name,f){f();checks.push(name);console.log('PASS',name);}
+console.time('layout');A.start();console.timeEnd('layout');A.closeShop();
+check('50 unique visible machines and 139 disabled colliders',()=>{assert.equal(new Set(A.getState().machines).size,50);assert.equal(T.space.polys.filter(p=>p.kind==='machine'&&p.disabled).length,139);assert.equal(new Set(T.factory.machineMeshes.flatMap(m=>m.userData.machineKeys)).size,50);});
+check('10 machine items plus items on 18 of 73 racks',()=>{assert.equal(T.loot.length,28);const m=T.loot.filter(l=>l.supportKind==='machine');assert.equal(m.length,10);assert.equal(new Set(m.map(l=>l.support)).size,10);assert(m.every(l=>A.getState().machines.includes(l.support)));});
+const reach=T.loot.map(l=>{T.player.pos.copy(l.access);return {support:l.support,kind:l.supportKind,reachable:T.lootInReach(l),distance:l.access.distanceTo(l.pos)};});
+check('every spawned item has a reachable pickup point',()=>assert(reach.every(l=>l.reachable)));
+check('20 second purchase phase and pause-aware play timer',()=>{assert.equal(A.getState().buyTime,20);tick(1);assert(A.getState().playSeconds>.99);A.pause();const before=A.getState().playSeconds;tick(2);assert.equal(A.getState().playSeconds,before);A.resume();tick(18);assert.equal(A.getState().mode,'buy');tick(1.1);assert.equal(A.getState().mode,'combat');});
+A.start();A.closeShop();
+check('items grant once and full health leaves medical loot',()=>{const l=T.loot.find(l=>{T.player.pos.copy(l.access);return T.lootInReach(l);});assert(l);l.kind='cash';T.player.pos.copy(l.access);T.tick(0);const money=A.getState().money;assert(T.pickupLoot());assert.equal(A.getState().money,money+150);assert(!T.loot.includes(l));assert(!T.pickupLoot());const h=T.loot.find(l=>{T.player.pos.copy(l.access);return T.lootInReach(l);});h.kind='heal';T.player.pos.copy(h.access);T.player.hp=100;T.tick(0);T.pickupLoot();assert(T.loot.includes(h));T.player.hp=80;T.tick(0);T.pickupLoot();assert.equal(T.player.hp,100);assert(!T.loot.includes(h));});
+check('next wave refreshes layout and loot without trapping player',()=>{const before=A.getState().machines.join(',');T.beginBuy();assert.notEqual(A.getState().machines.join(','),before);assert.equal(T.loot.length,28);assert(!T.space.blocked(T.player.pos.x,T.player.pos.y,T.player.pos.z));});
+check('cabinet visuals and collision both top out at 0.95m',()=>{assert.equal(A.config.cabinetHeight,.95);const ps=T.space.polys.filter(p=>p.kind==='cabinet');assert.equal(ps.length,262);assert(ps.every(p=>p.hi===.95));assert.equal(A.config.floorHeight,4.5);});
+check('player can cross above retained machines at 2m foot height',()=>{const o=C.FLOOR_DATA.objects.find(o=>o.kind==='machine'&&A.getState().machines.includes(o.name)&&!T.space.blocked(o.x,2,o.z,.22,1.72));assert(o);assert(T.space.blocked(o.x,0,o.z,.22,1.72));assert(!T.space.blocked(o.x,2,o.z,.22,1.72));});
+check('timer formats hours and restart resets elapsed time',()=>{T.setTime(3661.1);assert.equal(T.playTimeText(),'01:01:01');A.start();assert.equal(A.getState().playSeconds,0);});
+fs.writeFileSync(__dirname+'/evidence/wave-checks-S1.3.json',JSON.stringify({passed:true,browserGPUVerified:false,checks,access:reach},null,2));

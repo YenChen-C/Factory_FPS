@@ -1,0 +1,14 @@
+const fs=require('fs'),assert=require('assert');
+const harness=fs.readFileSync(__dirname+'/test.cjs','utf8').split("check('offline app")[0];
+const {A,T,C}=new Function('require','__dirname',harness+';return {A,T,C};')(require,__dirname);
+const checks=[];function check(n,f){f();checks.push(n);console.log('PASS',n);}
+A.start();A.closeShop();const X=T.destruction,V=C.THREE.Vector3;
+check('ceiling and fixtures use 4.5m',()=>{assert.equal(A.config.floorHeight,4.5);const ceiling=T.factory.ceiling;ceiling.updateMatrixWorld(true);const roof=ceiling.children.find(c=>c.geometry?.type==='ExtrudeGeometry');roof.geometry.computeBoundingBox();assert(Math.abs(roof.geometry.boundingBox.min.y-4.5)<.00001);});
+check('walls have 300 HP and machines have 200 HP',()=>{assert(X.walls.length);assert(X.walls.every(w=>w.hp===300));assert(X.machines.every(m=>m.hp===200));});
+let hit,origin,dir;for(const b of X.walls){for(let i=0;i<b.p.length;i++){const p=b.p[i],q=b.p[(i+1)%b.p.length],normal=new V(q[1]-p[1],0,p[0]-q[0]).normalize();for(const sign of [-1,1]){origin=new V((p[0]+q[0])/2,2.5,(p[1]+q[1])/2).addScaledVector(normal,.1*sign);dir=normal.clone().multiplyScalar(-sign);const h=T.space.cast(origin,dir,.2);if(h?.body===b){hit=h;break;}}if(hit)break;}if(hit)break;}assert(hit);const w=hit.body;
+check('wall disappears only at zero and ray passes through destroyed wall',()=>{X.hit(hit,299);assert.equal(w.hp,1);assert(T.factory.wallMeshes[w.wallIndex].visible);X.hit(hit,1);assert(w.disabled);assert(!T.factory.wallMeshes[w.wallIndex].visible);X.tick(0);assert.notEqual(T.space.cast(origin,dir,.2)?.body,w);assert(!X.hit(hit,20));});
+check('wall destruction persists into next wave',()=>{T.beginBuy();assert(w.disabled);assert(!T.factory.wallMeshes[w.wallIndex].visible);});
+check('machine burns at zero, preserves rendering and collision',()=>{const m=X.machines.find(m=>!m.disabled);X.hit({body:m},199);assert.equal(m.hp,1);assert(!X.burning.has(m));X.hit({body:m},1);assert(X.burning.has(m));assert(!m.disabled);assert(T.factory.machineMeshes.some(o=>o.userData.machineKeys.includes(m.machineName.replace(/^UF0+(?=\d)/,'UF'))));X.tick(1);const f=T.scene.getObjectByName('Machine_fire');assert.equal(f.count,3);assert(!X.hit({body:m},200));});
+check('all 50 machines burn within effect buffer budget',()=>{for(const m of X.machines.filter(m=>!m.disabled))X.hit({body:m},200);X.tick(2);assert.equal(X.burning.size,50);assert.equal(T.scene.getObjectByName('Machine_fire').count,150);assert.equal(T.scene.getObjectByName('Machine_smoke').count,100);});
+check('machine state resets each wave and walls restore on restart',()=>{T.beginBuy();assert.equal(X.burning.size,0);assert(X.machines.every(m=>m.hp===200));assert(w.disabled);A.start();assert(!w.disabled);assert.equal(w.hp,300);assert(T.factory.wallMeshes[w.wallIndex].visible);});
+fs.writeFileSync(__dirname+'/evidence/destruction-checks.json',JSON.stringify({passed:true,browserGPUVerified:false,checks},null,2));

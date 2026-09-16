@@ -1,0 +1,21 @@
+const fs=require('fs'),assert=require('assert');
+const harness=fs.readFileSync(__dirname+'/test.cjs','utf8').split("check('offline app")[0];
+const {A,T,C,tick}=new Function('require','__dirname',harness+';return {A,T,C,tick};')(require,__dirname);
+const checks=[];function check(n,f){f();checks.push(n);console.log('PASS',n);}
+const b=T.blessings;
+function choose(id){for(let i=0;i<200;i++){b.offer(2);if(b.state().options.some(o=>o.id===id)){assert(b.choose(id));return b.B.history.at(-1);}}throw Error('Could not offer '+id);}
+A.start();A.closeShop();
+check('first shop has no blessing and next wave offers three unique choices',()=>{assert(!b.pending());assert.equal(b.state().options.length,0);T.beginBuy();assert(b.pending());assert.equal(b.state().options.length,3);assert.equal(new Set(b.state().options.map(o=>o.id)).size,3);});
+check('pending choice pauses buy countdown and does not reroll when reopened',()=>{const before=A.getState().buyTime,ids=b.state().options.map(o=>o.id).join(',');T.tick(.3);assert.equal(A.getState().buyTime,before);A.closeShop();assert.equal(b.state().options.map(o=>o.id).join(','),ids);assert(!b.choose('not-an-option'));assert(!b.choose(b.state().options[0].id,99));});
+check('one free choice resolves only on click; cannot collect twice',()=>{const money=A.getState().money,h=b.B.history.length;assert.equal(h,0);const id=b.state().options[0].id;assert(b.choose(id));assert.equal(A.getState().money,money);assert.equal(b.B.history.length,h+1);assert(!b.choose(id));const timer=A.getState().buyTime;T.tick(.1);assert(A.getState().buyTime<timer);});
+b.reset();
+check('attack percentages use 30/40/50 and stack additively',()=>{const base=T.stats('pistol').damage;const a=choose('attack'),c=choose('attack');assert([30,40,50].includes(a.value));assert([30,40,50].includes(c.value));assert(Math.abs(T.stats('pistol').damage-base*(1+(a.value+c.value)/100))<.001);});
+check('free grenades are never truncated at the original cap',()=>{for(let i=0;i<4;i++){const n=A.getState().grenades,h=choose('grenade');assert([1,2,3].includes(h.value));assert.equal(A.getState().grenades,n+h.value);}assert(A.getState().grenades>5);});
+check('melee reach, speed and magazine bonuses affect live stats',()=>{const mag=T.stats('pistol').mag;choose('reach');choose('speed');choose('mag');assert(b.B.reach>=1.3);assert(b.B.speed>=1.15);assert(T.stats('pistol').mag>mag);});
+check('height affects mesh and player collision safely',()=>{const h=choose('height');assert([-30,30].includes(h.value));T.tick(.01);assert(Math.abs(T.avatar.group.scale.y-b.B.height)<.001);assert(!T.space.blocked(T.player.pos.x,T.player.pos.y,T.player.pos.z,.22,1.72*b.B.height));});
+check('armor increases maximum and capacity can be purchased/refilled',()=>{const old=T.armorMax(),hp=T.player.armor,h=choose('armor');assert([10,15,20,25].includes(h.value));assert.equal(T.armorMax(),old+h.value);assert.equal(T.player.armor,hp+h.value);T.player.armor=0;A.buy('armor');assert.equal(T.player.armor,T.armorMax());});
+check('elemental blessing adds its rolled value to gun damage',()=>{const before=T.stats('pistol').damage,h=choose('element');assert(h.value>=1&&h.value<=10);assert(['火','雷','水','土'].includes(h.element));assert.equal(T.stats('pistol').damage,before+h.value);});
+check('blessings persist across waves and can be skipped explicitly',()=>{const a=b.B.attack;T.beginBuy();assert.equal(b.B.attack,a);assert(b.pending());assert(b.skip());assert(!b.pending());assert(!b.skip());});
+check('revival is automatic, consumed once, and grants three seconds of protection',()=>{choose('revive');T.setMode('combat');T.actions.reset();T.player.hp=1;T.player.armor=0;const count=b.B.revives;T.damagePlayer(10000,true);assert.equal(T.player.hp,100);assert.equal(A.getState().mode,'combat');assert.equal(b.B.revives,count-1);T.damagePlayer(10000,true);assert.equal(T.player.hp,100);T.setTime(T.getTime()+3.1);T.damagePlayer(10000,true);assert.equal(A.getState().mode,'dead');});
+check('restart removes run blessings and returns to normal dimensions',()=>{A.start();assert.equal(b.B.attack,1);assert.equal(b.B.height,1);assert.equal(b.B.mag,1);assert.equal(b.B.revives,0);assert.equal(b.B.history.length,0);assert.equal(T.armorMax(),100);});
+fs.writeFileSync(__dirname+'/evidence/blessing-checks.json',JSON.stringify({passed:true,browserGPUVerified:false,checks},null,2));
