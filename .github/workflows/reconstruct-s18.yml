@@ -1,0 +1,48 @@
+name: Reconstruct S1.8 HTML
+
+on:
+  push:
+    paths:
+      - '.upload_s18/**'
+      - '.github/workflows/reconstruct-s18.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reconstruct and verify HTML
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, lzma, hashlib
+          parts = sorted(Path('.upload_s18').glob('part*.b64'))
+          if len(parts) != 23:
+              print(f'Waiting for all parts: {len(parts)}/23')
+              raise SystemExit(0)
+          encoded = ''.join(p.read_text(encoding='ascii').strip() for p in parts)
+          compressed = base64.b64decode(encoded)
+          html = lzma.decompress(compressed)
+          expected = 'eb8e5698dbd6356550053c2128063d2b4220e33fb4ffc57b0f281f25f9138527'
+          actual = hashlib.sha256(html).hexdigest()
+          if actual != expected:
+              raise SystemExit(f'SHA256 mismatch: {actual}')
+          Path('3F_工廠防線_動作競技版_S1.8.html').write_bytes(html)
+          print(f'Reconstructed {len(html)} bytes; SHA256={actual}')
+          PY
+      - name: Commit reconstructed file
+        shell: bash
+        run: |
+          if [ ! -f '3F_工廠防線_動作競技版_S1.8.html' ]; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add '3F_工廠防線_動作競技版_S1.8.html'
+          git rm -r .upload_s18
+          git commit -m 'Add 3F Factory Defense S1.8 HTML' || exit 0
+          git push
