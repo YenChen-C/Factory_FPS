@@ -9,8 +9,8 @@ function makeTactics(T,S,api){
   if(e.visible){e.lastKnown=api.player.pos.clone();e.lastSeen=now;e.searchEnd=now+15;e.awareness='追擊';e.facing=Math.atan2(-delta.x,-delta.z);}
   else if(e.lastKnown&&now<e.searchEnd)e.awareness='搜索';else{e.lastKnown=null;e.awareness='巡邏';}
   let destination=e.lastKnown||e.patrol;if(!destination||(!e.lastKnown&&destination.distanceTo(e.pos)<.65)){e.patrol=goal(e.pos);destination=e.patrol;e.routeAt=0;}
-  const keepDistance=e.boss?7:6;let movement=null;
-  if(e.visible){if(distance>keepDistance)movement=api.player.pos.clone();else if(distance<2.5)movement=e.pos.clone().add(e.pos.clone().sub(api.player.pos).setY(0).normalize());}
+  const keepDistance=e.creeper?1:e.boss?7:6;let movement=null;
+  if(e.visible){if(distance>keepDistance)movement=api.player.pos.clone();else if(!e.creeper&&distance<2.5)movement=e.pos.clone().add(e.pos.clone().sub(api.player.pos).setY(0).normalize());}
   else if(destination.distanceTo(e.pos)>.7){if(now>=e.routeAt){e.route=S.path(e.pos,destination);e.routeAt=now+2.5;}while(e.route.length&&e.route[0].distanceTo(e.pos)<.20)e.route.shift();movement=e.route[0];}
   else if(e.lastKnown)e.facing+=dt*1.4;
   if(movement&&e.flash<.2){const v=movement.clone().sub(e.pos).setY(0);if(v.length()>.04){if(!e.visible)e.facing=Math.atan2(-v.x,-v.z);v.normalize().multiplyScalar((e.boss?.95:1.25+e.tier*.2)*(e.status['水']?.end>now?.9:1)*dt);const moved=api.move(e,v.x,0,v.z,e.boss?2.04:1.7,e.boss?.264:.22);e.stuck=moved?0:e.stuck+dt;api.openDoor(e.pos);if(e.stuck>1){e.routeAt=0;if(!e.lastKnown)e.patrol=goal(e.pos);e.stuck=0;}e.model.legs[0].rotation.x=Math.sin(now*8)*.4;e.model.legs[1].rotation.x=-e.model.legs[0].rotation.x;}}
