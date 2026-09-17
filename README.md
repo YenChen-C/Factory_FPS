@@ -1,3 +1,9 @@
+## S1.11 射擊練習場
+
+開啟 `index.html` 或 `Factory_Defense_S1.11.html`，在主頁選「射擊練習場」。場上固定五名只會行走的敵人，死亡立即隨機重生。上方控制區的「離開練習場」可返回主頁，手機若已收合控制區請先展開。練習不計入波次、金錢或永久武器經驗。
+
+驗證：`node test-practice.cjs`，涵蓋巡邏、不攻擊、重生與模式切換；其餘測試命令見下方。
+
 # Factory Defense S1.10
 
 [Play online](https://yenchen-c.github.io/Factory_FPS/)

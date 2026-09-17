@@ -3,9 +3,9 @@ function makeTactics(T,S,api){
  function goal(pos,min=3){const candidates=navPoints().filter(p=>p.distanceTo(pos)>min&&p.distanceTo(pos)<32);return candidates.length?candidates[Math.floor(Math.random()*candidates.length)].clone():pos.clone();}
  function init(e){e.awareness='巡邏';e.lastKnown=null;e.lastSeen=-99;e.facing=Math.random()*Math.PI*2;e.patrol=goal(e.pos);e.route=[];e.routeAt=0;e.searchEnd=0;}
  function forget(e){e.lastKnown=null;e.lastSeen=-99;e.searchEnd=0;e.visible=false;e.awareness='巡邏';e.route=[];e.routeAt=0;e.stuck=0;e.patrol=goal(e.pos);e.cooldown=Math.max(e.cooldown||0,1);}
- function hear(pos,radius=20){for(const e of api.enemies())if(e.hp>0&&e.flash<=0&&e.pos.distanceTo(pos)<radius&&!e.visible){e.lastKnown=pos.clone();e.lastSeen=api.time();e.searchEnd=api.time()+15;e.awareness='搜索';e.routeAt=0;}}
+ function hear(pos,radius=20){if(api.passive?.())return;for(const e of api.enemies())if(e.hp>0&&e.flash<=0&&e.pos.distanceTo(pos)<radius&&!e.visible){e.lastKnown=pos.clone();e.lastSeen=api.time();e.searchEnd=api.time()+15;e.awareness='搜索';e.routeAt=0;}}
  function think(e,dt){const now=api.time(),eye=e.pos.clone().add(new T.Vector3(0,e.boss?1.65:1.36,0)),target=api.player.pos.clone().add(new T.Vector3(0,api.playerHeight()*1.15,0)),delta=target.clone().sub(eye),distance=delta.length(),front=new T.Vector3(-Math.sin(e.facing),0,-Math.cos(e.facing));
-  e.visible=e.flash<=0&&distance<30&&(distance<3||delta.clone().setY(0).normalize().dot(front)>.173648)&&S.clear(eye,target);
+  e.visible=!api.passive?.()&&e.flash<=0&&distance<30&&(distance<3||delta.clone().setY(0).normalize().dot(front)>.173648)&&S.clear(eye,target);
   if(e.visible){e.lastKnown=api.player.pos.clone();e.lastSeen=now;e.searchEnd=now+15;e.awareness='追擊';e.facing=Math.atan2(-delta.x,-delta.z);}
   else if(e.lastKnown&&now<e.searchEnd)e.awareness='搜索';else{e.lastKnown=null;e.awareness='巡邏';}
   let destination=e.lastKnown||e.patrol;if(!destination||(!e.lastKnown&&destination.distanceTo(e.pos)<.65)){e.patrol=goal(e.pos);destination=e.patrol;e.routeAt=0;}
