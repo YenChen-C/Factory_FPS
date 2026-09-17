@@ -6,7 +6,7 @@ function makeFactory(THREE, D, options={}) {
  const mats={};for(const [k,c]of Object.entries(colors))mats[k]=new THREE.MeshStandardMaterial({color:c,roughness:k==='metal'||k==='wire'?.3:.7,metalness:k==='metal'||k==='wire'?.8:.05});
  mats.lamp=new THREE.MeshStandardMaterial({color:0xf5fbff,emissive:0xd9ecff,emissiveIntensity:.7});
  const boxGeo=new THREE.BoxGeometry(1,1,1),cylGeo=new THREE.CylinderGeometry(1,1,1,10),sphereGeo=new THREE.SphereGeometry(1,10,6),bucket=new Map(),ceilingBucket=new Map(),tmp=new THREE.Object3D();
- let currentMachine=null;
+ const cabinetInstances=new Map();let currentMachine=null;
  function add(type,mat,x,y,z,w,h,d,rx=0,ry=0,rz=0,parent=null){
   if(parent===ceiling){const key=type+':'+mat;if(!ceilingBucket.has(key))ceilingBucket.set(key,[]);ceilingBucket.get(key).push([x,y,z,w,h,d,rx,ry,rz,null]);return;}
   if(parent){let mesh=new THREE.Mesh(type==='box'?boxGeo:type==='cyl'?cylGeo:sphereGeo,mats[mat]);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);mesh.rotation.set(rx,ry,rz);parent.add(mesh);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;}
@@ -33,7 +33,7 @@ function makeFactory(THREE, D, options={}) {
  const roof=poly({outer:D.floor},'white',CFG.floorHeight,.15,ceiling);if(mats.ceiling)roof.material=mats.ceiling;
  for(const f of D.fixtures){for(const offset of [-.72,.72]){box('metal',f.x,CFG.floorHeight-.037,f.z+offset,2.35,.075,.12,0,ceiling);box('lamp',f.x,CFG.floorHeight-.082,f.z+offset,2.27,.015,.065,0,ceiling);}}
  for(const f of D.objects){
- currentMachine=f.kind==='machine'?f.name:null;
+ currentMachine=f.kind==='machine'?f.name:f.kind==='cabinet'?'CAB_'+D.objects.indexOf(f):null;
  const {x,z,w,d,kind}=f;const sy=kind==='cabinet'?CFG.cabinetHeight/1.295:1;const yaw=f.yaw||0,co=Math.cos(yaw),si=Math.sin(yaw);
  function b(m,xx,y,zz,ww,h,dd){box(m,x+xx*co-zz*si,y*sy,z+xx*si+zz*co,ww,h*sy,dd,yaw);}
  function c(m,xx,y,zz,r,h){cyl(m,x+xx*co-zz*si,y,z+xx*si+zz*co,r,h);}
@@ -86,10 +86,11 @@ function makeFactory(THREE, D, options={}) {
  for(const a of D.doors){
   const h=a.hinge,angle=a.angle,w=a.r;const group=new THREE.Group();group.name=a.id;group.position.set(h[0],0,h[1]);group.rotation.y=-angle;root.add(group);
   const H=a.height||2.1;box(a.type==='sliding'?'glass':'teal',w/2,H/2,0,w-.035,H-.035,.05,0,group);box('glass',w/2,H*.67,-.028,w*.68,H*.34,.016,0,group);box('metal',w*.82,H*.48,-.048,.035,.15,.035,0,group);box('metal',w*.82,H*.48,.048,.035,.15,.035,0,group);
-  const ux=Math.cos(angle),uz=Math.sin(angle);for(const u of [0,w])box('trim',h[0]+u*ux,H/2,h[1]+u*uz,.055,H,.17,angle);
-  box('wall',h[0]+w*.5*ux,(CFG.floorHeight+H)/2,h[1]+w*.5*uz,w+.06,CFG.floorHeight-H,.17,-angle);
-  if(a.type==='sliding'){box('metal',h[0]+w/2,2.25,h[1],w*2.1,.12,.22);box('black',h[0]+w/2,2.20,h[1]-.13,.12,.07,.08);labels.push({text:'自動門',x:h[0]+w/2,y:2.5,z:h[1],width:1.2});}
-  doorDefs.push({...a,group,open:false,t:0,target:0});
+  const frame=new THREE.Group();frame.name=a.id+'_frame';root.add(frame);
+  const ux=Math.cos(angle),uz=Math.sin(angle);for(const u of [0,w])box('trim',h[0]+u*ux,H/2,h[1]+u*uz,.055,H,.17,angle,frame);
+  box('wall',h[0]+w*.5*ux,(CFG.floorHeight+H)/2,h[1]+w*.5*uz,w+.06,CFG.floorHeight-H,.17,-angle,frame);
+  if(a.type==='sliding'){box('metal',h[0]+w/2,2.25,h[1],w*2.1,.12,.22,0,frame);box('black',h[0]+w/2,2.20,h[1]-.13,.12,.07,.08,0,frame);labels.push({text:'自動門',x:h[0]+w/2,y:2.5,z:h[1],width:1.2});}
+  doorDefs.push({...a,group,frame,open:false,t:0,target:0});
  }
  // CAD floor strokes remain a reference layer, independently toggled.
  const pts=[];for(const ps of D.plan)for(let i=1;i<ps.length;i++)pts.push(ps[i-1][0],.012,ps[i-1][1],ps[i][0],.012,ps[i][1]);
@@ -99,7 +100,7 @@ function makeFactory(THREE, D, options={}) {
  const normalizeMachine=options.normalizeMachine||(v=>String(v).trim().toUpperCase().replace(/^UF0+(?=\d)/,'UF'));
  const machineObjects=D.objects.filter(o=>o.kind==='machine');
  function makeBatch(k,arr,material){const type=k.split(':')[0],mesh=new THREE.InstancedMesh(type==='box'?boxGeo:type==='cyl'?cylGeo:sphereGeo,material,arr.length);mesh.name=k;arr.forEach((a,i)=>{tmp.position.set(a[0],a[1],a[2]);tmp.scale.set(a[3],a[4],a[5]);tmp.rotation.set(a[6],a[7],a[8]);tmp.updateMatrix();mesh.setMatrixAt(i,tmp.matrix);});mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();root.add(mesh);return mesh;}
- for(const[k,arr]of bucket){const fixed=arr.filter(a=>!a[9]);if(fixed.length)makeBatch(k,fixed,mats[k.split(':')[1]]);for(const a of arr)if(a[9])machineEntries.push({k,a,key:normalizeMachine(a[9])});}
+ for(const[k,arr]of bucket){const fixed=arr.filter(a=>!a[9]||a[9].startsWith('CAB_'));if(fixed.length){const mesh=makeBatch(k,fixed,mats[k.split(':')[1]]);fixed.forEach((a,i)=>{if(a[9]){if(!cabinetInstances.has(a[9]))cabinetInstances.set(a[9],[]);const matrix=new THREE.Matrix4();mesh.getMatrixAt(i,matrix);cabinetInstances.get(a[9]).push({mesh,i,matrix});}});}for(const a of arr)if(a[9]&&!a[9].startsWith('CAB_'))machineEntries.push({k,a,key:normalizeMachine(a[9])});}
  for(const [k,arr]of ceilingBucket){const mesh=makeBatch(k,arr,mats[k.split(':')[1]]);root.remove(mesh);ceiling.add(mesh);}
  const stateColors={down:0xff3030,abnormal:0xffca16,work:0x24ef75};
  const halo=new THREE.Group();halo.count=0;halo.visible=false;const lightPool=[];
@@ -116,6 +117,7 @@ function makeFactory(THREE, D, options={}) {
  updateMachineStates(new Map());
  const avatar=new THREE.Group();avatar.name='Player';root.add(avatar);sphere('white',0,1.51,0,.17,.21,.17,avatar);sphere('skin',0,1.51,-.145,.12,.12,.035,avatar);box('teal',0,.97,0,.37,.64,.23,0,avatar);box('white',0,1.11,-.123,.27,.11,.025,0,avatar);
  const limbs=[];for(const s of [-1,1]){let leg=new THREE.Group();leg.position.set(s*.1,.7,0);avatar.add(leg);box('white',0,-.30,0,.13,.58,.14,0,leg);box('black',0,-.64,-.045,.14,.12,.24,0,leg);limbs.push(leg);let arm=new THREE.Group();arm.position.set(s*.245,1.22,0);avatar.add(arm);box('white',0,-.25,0,.12,.49,.12,0,arm);sphere('white',0,-.51,0,.07,.09,.07,arm);limbs.push(arm);}
- return {wallMeshes,setMachineSelection,root,ceiling,cad,labels,doors:doorDefs,colliders,avatar,limbs,turnstiles,mats,updateMachineStates,updateStatusLights,machineMeshes,statusHalo:halo,getMachineStates:()=>new Map(activeStates)};
+ function setCabinetVisible(id,visible){for(const e of cabinetInstances.get(id)||[]){e.mesh.setMatrixAt(e.i,visible?e.matrix:new THREE.Matrix4().makeScale(0,0,0));e.mesh.instanceMatrix.needsUpdate=true;}}
+ return {setCabinetVisible,wallMeshes,setMachineSelection,root,ceiling,cad,labels,doors:doorDefs,colliders,avatar,limbs,turnstiles,mats,updateMachineStates,updateStatusLights,machineMeshes,statusHalo:halo,getMachineStates:()=>new Map(activeStates)};
 }
 if(typeof module!=='undefined')module.exports={makeFactory};

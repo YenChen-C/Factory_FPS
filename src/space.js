@@ -6,13 +6,13 @@ function makeSpace(D,F){
  function index(o){const id=polys.length;polys.push(o);o.minX=Math.min(...o.p.map(p=>p[0]));o.maxX=Math.max(...o.p.map(p=>p[0]));o.minZ=Math.min(...o.p.map(p=>p[1]));o.maxZ=Math.max(...o.p.map(p=>p[1]));for(let x=Math.floor((o.minX-.3)/cell);x<=Math.floor((o.maxX+.3)/cell);x++)for(let z=Math.floor((o.minZ-.3)/cell);z<=Math.floor((o.maxZ+.3)/cell);z++){const k=x+','+z;if(!hash.has(k))hash.set(k,[]);hash.get(k).push(id);}}
  function rect(x,z,w,d,lo,hi,kind='solid',yaw=0){const c=Math.cos(yaw),s=Math.sin(yaw);index({p:[[-w/2,-d/2],[w/2,-d/2],[w/2,d/2],[-w/2,d/2]].map(([a,b])=>[x+a*c-b*s,z+a*s+b*c]),lo,hi,kind});}
  for(const [wallIndex,w] of D.walls.entries())index({wallIndex,p:w.outer,holes:w.holes||[],lo:0,hi:CFG.floorHeight,kind:'wall'});
- for(const d of D.doors)rect(d.hinge[0]+Math.cos(d.angle)*d.r/2,d.hinge[1]+Math.sin(d.angle)*d.r/2,d.r+.06,.17,d.height||2.1,CFG.floorHeight,'wall',d.angle);
+ for(const d of D.doors){rect(d.hinge[0]+Math.cos(d.angle)*d.r/2,d.hinge[1]+Math.sin(d.angle)*d.r/2,d.r+.06,.17,d.height||2.1,CFG.floorHeight,'wall',d.angle);polys[polys.length-1].doorFrameId=d.id;}
  for(const o of D.objects){if(o.kind==='rack'){
  // Open metal rack: posts and thin shelf planes, not a filled bounding box.
  const yaw=o.yaw||0,c=Math.cos(yaw),s=Math.sin(yaw);for(const a of [-o.w/2+.025,o.w/2-.025])for(const b of [-o.d/2+.025,o.d/2-.025])rect(o.x+a*c-b*s,o.z+a*s+b*c,.045,.045,0,1.8,'rack');
  for(const h of [.16,.70,1.24,1.78])rect(o.x,o.z,o.w,o.d,h-.015,h+.015,'rack',yaw);
  }else if(o.kind==='table'){rect(o.x,o.z,o.w,o.d,.725,.795,'table',o.yaw||0);for(const a of [-o.w/2+.07,o.w/2-.07])for(const b of [-o.d/2+.07,o.d/2-.07])rect(o.x+a*Math.cos(o.yaw||0)-b*Math.sin(o.yaw||0),o.z+a*Math.sin(o.yaw||0)+b*Math.cos(o.yaw||0),.05,.05,0,.76,'table');}
- else index({p:o.outline,lo:0,hi:o.kind==='machine'?1.8:CFG.cabinetHeight,kind:o.kind,machineName:o.kind==='machine'?o.name:null});}
+ else index({cabinetId:o.kind==='cabinet'?'CAB_'+D.objects.indexOf(o):null,p:o.outline,lo:0,hi:o.kind==='machine'?1.8:CFG.cabinetHeight,kind:o.kind,machineName:o.kind==='machine'?o.name:null});}
  for(const a of D.airUnits)for(const s of [-1,1])rect(a.x+s*(a.w/2-.1),a.z,.18,a.d,0,2.3,'wall');
  for(const b of D.barriers||[])rect(b.x,b.z,b.w,b.d,0,b.h,'wall');
  for(const t of D.turnstiles)rect(t.x,t.z,.3,.58,0,1.08,'solid');
