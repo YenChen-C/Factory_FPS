@@ -201,7 +201,7 @@ $('exportSave').onclick=()=>{const blob=new Blob([JSON.stringify({schema:'factor
 // Mobile controls are independent of the combat loop.
 let touchReset=()=>{};
 if(mobile){
- document.body.classList.add('mobile');
+ document.body.classList.add('mobile');$('pauseHelp').textContent='左搖桿移動 · 右射擊鍵按住可滑瞄 · 點按瞄準／蹲下 · 長按跳躍噴射 · 投擲與技能點開選擇';
  const key=(code,down)=>{if(down)keys.add(code);else{const was=keys.delete(code);if(code==='Space')jumpLatch=false;if(code==='KeyV'&&was){endHook();hookLatch=false;}}};
  const action={reload,pickup,door:()=>openNearbyDoor(P.pos,true),interact:()=>{const agv=tactics.getAGV();if(nearestLoot||nearestDrop||(agv&&agv.hp>0&&agv.supplies>0&&agv.pos.distanceTo(P.pos)<1.7))pickup();else openNearbyDoor(P.pos,true);},grenade:()=>throwItem('grenade'),flash:()=>throwItem('flash'),strike:()=>actions.strike(),heavy:()=>actions.strike(true),pulse:()=>actions.pulse(),dodge:()=>actions.dodge(),weapon:()=>switchGun(active===inventory.side?inventory.main:inventory.side)};
  touchUI=makeMobileControls({$,canvas:renderer.domElement,allowed:()=>!shopOpen&&(mode==='buy'||mode==='combat'),key,move:(x,z,active)=>Object.assign(touchMove,{x,z,active}),look:(dx,dy,s)=>{yaw-=dx*s;pitch=clamp(pitch-dy*s,-1,.85);updateCamera(1);},fireHeld:v=>fireHeld=v,aim:v=>aim=v,aiming:()=>aim,fire,action:n=>action[n]?.(),unlock:()=>battleAudio.unlock(),pause:()=>pauseGame(),resume});
